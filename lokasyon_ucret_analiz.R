@@ -5,6 +5,7 @@
 #DATASET
 
 #ucret_tbl <- dbo.ABDMRUNITSTRUCTUREALLOWANCESCALE
+#birimler_lokasyon_tbl <- SELECT * FROM [smartAx].[dbo].[vMusProjeBirimLokasyon]
 
 library(dplyr)
 

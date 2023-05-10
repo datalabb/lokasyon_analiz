@@ -79,3 +79,5 @@ lokasyon_data <- sirkulasyon_tablosu_avg %>%
 
 
 lokasyon_data
+
+
