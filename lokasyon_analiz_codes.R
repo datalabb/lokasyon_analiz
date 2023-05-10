@@ -15,9 +15,8 @@ library(tidyverse)
 
 
 
-#SİRKÜLASYON TABLOSU
-#Belli tarih aralığında o birimde çalışan personel sayısı ve birimden ayrılan personel sayısının hesaplanıp; oranlanarak sirkülasyon katsayısının dönem bazlı oluşturulması.
 
+#Belli tarih aralığında o birimde çalışan personel sayısı hesaplanması
 
 
 donem_tarih <- as.Date(dmy("01.05.2023"))
@@ -32,16 +31,12 @@ toplam_personel_sayisi <- function(donem = donem_tarih) {
     group_by(PROJNAME, PROJECTUNITNAME, PROJECTUNITID ) %>%
     rename(OrgSubeId = "BRANCHID",
            OrgBolgeId = "BUSINESSUNIT") %>%
-    summarise(saha_per = length(unique(ABTCKIMLIKNO)),
-              ayrılan_per = sum(ENDDATE == donem),
-              sirkülasyon_oranı = ayrılan_per / saha_per ) %>%
+    summarise(saha_per = length(unique(ABTCKIMLIKNO))) %>%
     mutate(Donem_tarih = donem) %>%
     mutate(Ay = format(donem, "%B")) %>%
     ungroup()
-  
-  return(istihdam_log_tbl_filtered)
-}
 
+}
 
 
 sirkulasyon_tablosu <- data.frame()
@@ -51,6 +46,45 @@ for (donem in as.list(hesaplanacak_aylar)) {
   sirkulasyon_tablosu = rbind(sirkulasyon_tablosu , p)
 }
 sirkulasyon_tablosu 
+
+#Belli tarih aralığında o birimden ayrılan personel sayısı hesaplanması
+
+
+
+ayrılan_personel_sayisi <- function(donem = donem_tarih) {
+  istihdam_log_tbl_filtered <- istihdam_log_saha_tbl %>%
+    filter(ENDDATE == donem) %>%
+    group_by(PROJNAME, PROJECTUNITNAME, PROJECTUNITID ) %>%
+    rename(OrgSubeId = "BRANCHID",
+           OrgBolgeId = "BUSINESSUNIT") %>%
+    summarise(ayrılan_per = length(unique(ABTCKIMLIKNO))) %>%
+    mutate(Donem_tarih = donem) %>%
+    mutate(Ay = format(donem, "%B")) %>%
+    ungroup()
+  
+}
+
+
+ayrılan_tablosu <- data.frame()
+
+for (donem in as.list(hesaplanacak_aylar)) {
+  p <- ayrılan_personel_sayisi(donem)
+  ayrılan_tablosu = rbind(ayrılan_tablosu , p)
+}
+ayrılan_tablosu 
+
+
+
+
+#TOPLAM PERSONEL İLE AYRILAN TABLOSU BİRLEŞTİRİLECEK. (5/10/2023)
+
+
+
+
+
+
+
+#BURDAN SONRASI DATALAR BİRLEŞTİKTEN SONRA DEVAM EDECEK.
 
 
 
