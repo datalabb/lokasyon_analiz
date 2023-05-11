@@ -82,7 +82,7 @@ genel_tablo$ayrılan_per[is.na(genel_tablo$ayrılan_per)] <- 0
 
 str(genel_tablo)
 
-#BİRİM/DÖNEM BAZLI SİRKÜLASYON KATSAYISININ DATAYA SÜTUN OLARAK EKLENMESİ
+#BİRİM/DÖNEMBAZLI SİRKÜLASYON KATSAYISININ DATAYA SÜTUN OLARAK EKLENMESİ
 
 
 genel_tablo$sirkulasyon_oranı <- genel_tablo$ayrılan_per/ genel_tablo$saha_per
