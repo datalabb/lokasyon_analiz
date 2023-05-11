@@ -1,20 +1,13 @@
 
 #SİRKÜLASYON ÇALIŞMASI
 
-#PACKAGES
 
-library(lubridate)
-library(tidyverse)
 
 #DATA SETS
-
 
 #smart_birimler_tbl <- SELECT * FROM [smartAx].[dbo].[vMusBirim]
 #istihdam_log_saha_tbl <- SELECT * FROM DynamicsAX_Live.dbo.ABPYRPERSONELISTIHDAMLOGVIEW where EMPLOYEETYPE = 1
 #birimler_lokasyon_tbl <- SELECT * FROM [smartAx].[dbo].[vMusProjeBirimLokasyon]
-
-
-
 
 #Belli tarih aralığında o birimde çalışan personel sayısı hesaplanması
 
@@ -39,13 +32,13 @@ toplam_personel_sayisi <- function(donem = donem_tarih) {
 }
 
 
-sirkulasyon_tablosu <- data.frame()
+personel_tablosu <- data.frame()
 
 for (donem in as.list(hesaplanacak_aylar)) {
   p <- toplam_personel_sayisi(donem)
-  sirkulasyon_tablosu = rbind(sirkulasyon_tablosu , p)
+  personel_tablosu = rbind(personel_tablosu , p)
 }
-sirkulasyon_tablosu 
+personel_tablosu 
 
 #Belli tarih aralığında o birimden ayrılan personel sayısı hesaplanması
 
@@ -76,42 +69,32 @@ ayrılan_tablosu
 
 
 
-#TOPLAM PERSONEL İLE AYRILAN TABLOSU BİRLEŞTİRİLECEK. (5/10/2023)
+
+#TOPLAM PERSONEL İLE AYRILAN TABLOSU BİRLEŞTİRİLMESİ
 
 
+genel_tablo <- personel_tablosu %>% left_join(ayrılan_tablosu, by= "PROJECTUNITNAME") %>% 
+  select(PROJNAME.x, PROJECTUNITNAME, PROJECTUNITID.x, saha_per, ayrılan_per, Donem_tarih.x, Ay.x)
 
 
+genel_tablo$ayrılan_per[is.na(genel_tablo$ayrılan_per)] <- 0
 
 
+str(genel_tablo)
 
-#BURDAN SONRASI DATALAR BİRLEŞTİKTEN SONRA DEVAM EDECEK.
+#BİRİM/DÖNEM BAZLI SİRKÜLASYON KATSAYISININ DATAYA SÜTUN OLARAK EKLENMESİ
 
+
+genel_tablo$sirkulasyon_oranı <- genel_tablo$ayrılan_per/ genel_tablo$saha_per
 
 
 #ORTALAMA SİRKÜLASYON TABLOSU
-#Birimlerin dönemlik hesaplanan sirkülasyon oranlarının ortalamasının alınarak 2023 yılı ortalama sirkülasyon oranının hesaplanması
-sirkulasyon_tablosu_avg <- sirkulasyon_tablosu %>%
-  group_by(PROJNAME, PROJECTUNITNAME, PROJECTUNITID) %>%
-  summarise(OrtSirkülasyon = mean(sirkülasyon_oranı, na.rm = TRUE)) %>%
+#Birimlerin dönemlik hesaplanan sirkülasyon oranlarının ortalamasının alınarak birim bazlı 2023 yılı ortalama sirkülasyon oranının hesaplanması
+personel_tablosu_avg <- genel_tablo %>%
+  group_by(PROJNAME.x, PROJECTUNITNAME, PROJECTUNITID.x) %>%
+  summarise(OrtSirkulasyon = mean(sirkulasyon_oranı, na.rm = TRUE)) %>%
   ungroup()
 
-sirkulasyon_tablosu_avg 
-
-
-
-#LOKASYON ÇALIŞMASI ÖN HAZIRLIK
-#sirkulasyon_tablosu_avg ile birimler_lokasyon_tbl tablolarının birleştirilmesi
-
-
-sirkulasyon_tablosu_avg <- sirkulasyon_tablosu_avg%>%  rename(AxBirimId = "PROJECTUNITID")
-
-colnames(birimler_lokasyon_tbl)
-
-lokasyon_data <- sirkulasyon_tablosu_avg %>% 
-  left_join(birimler_lokasyon_tbl, by= "AxBirimId") %>% 
-  select(PROJNAME, PROJECTUNITNAME, AxBirimId, OrtSirkülasyon, Bölge, Sube, Segment, AltSegment, HizmetYeri, Enlem, Boylam)
-
-
-lokasyon_data
+personel_tablosu_avg 
 
 
