@@ -36,15 +36,11 @@ library(dplyr)
 library(scales)
 
 
-
-
 # Core
 library(tidyverse)
 library(tidyquant)
 library(scales)
 library(plotly)
-
-
 
 library(shinyWidgets)
 library(shiny)
@@ -52,14 +48,10 @@ library(viridisLite)
 library(treemap)
 
 
-
-
 library(ggridges)
 library(ggplot2)
 library(viridis)
 library(hrbrthemes)
-
-
 
 
 # Map
@@ -69,14 +61,10 @@ library(leaflet)
 library(leaflet.extras)
 
 
-
 # Modeling
 library(timetk)
 library(parsnip)
 library(collapsibleTree)
-
-
-
 # Apriori
 
 
@@ -311,20 +299,96 @@ birim_per_loc_sirk_tbl
 
 
 
+## 2.4 Finans ----
+
+
+
+
+# Birim/Proje Bazında Kar Yüzdelerinin Hesaplanması
+
+
+
+finans_tbl_kar <- finans_tbl %>%
+  
+  filter(PERIODMONTH < max(PERIODMONTH)-1) %>%
+  select(AMOUNTCREDIT, AMOUNTDEBIT, BRANCHID, BUSINESSUNIT, CUSTACCOUNT, EGC, MILLI, PERIODENDDATE, PERIODMONTH, PERIODYEAR, PROJID) %>%
+  group_by(CUSTACCOUNT, PROJID, EGC, MILLI, PERIODYEAR, PERIODMONTH, PERIODENDDATE) %>%
+  summarise(AMOUNTCREDIT2 = sum(AMOUNTCREDIT),
+            AMOUNTDEBIT2 = sum(AMOUNTDEBIT)) %>%
+  
+  mutate(Gelir = AMOUNTCREDIT2 * -1,
+         Gider = AMOUNTDEBIT2 * -1,
+         Kar1 = Gelir + Gider,
+         Kar1_Yuzde = Kar1 / Gelir)
+
+
+
+finans_tbl_kar_cum <- finans_tbl_kar %>%
+  
+  group_by(CUSTACCOUNT, PROJID) %>%
+  
+  mutate(Gelir_cum = cumsum(Gelir),
+         Gider_cum = cumsum(Gider),
+         Kar1_cum = Gelir_cum + Gider_cum,
+         Kar1_Yuzde_cum = Kar1_cum / Gelir_cum) %>%
+  ungroup()
+
+
+
+# filter(CUSTACCOUNT == "M03014")
+
+
+
+finans_tbl_kar_cum <- finans_tbl_kar_cum [!finans_tbl_kar_cum$CUSTACCOUNT == "", ]
+finans_tbl_kar_cum
+
+
+
+finans_tbl_kar_last <- finans_tbl_kar_cum %>%
+  filter(PERIODMONTH == max(PERIODMONTH)) %>%
+  select(PROJID, PERIODMONTH, Gelir_cum, Gider_cum, Kar1_cum, Kar1_Yuzde_cum) %>%
+  rename(MusBirimId = PROJID) %>%
+  select(-PERIODMONTH)
+
+
+
+finans_tbl_kar_last<- finans_tbl_kar_last [!finans_tbl_kar_last$Kar1_Yuzde_cum == -Inf, ]
+finans_tbl_kar_last<- finans_tbl_kar_last [!finans_tbl_kar_last$Kar1_Yuzde_cum == Inf, ]
+
+
+
+finans_tbl_kar_last
+
+
+
+
+## 2.5 Tüm Tablo Birleştirme (Lokasyon-Personel-Sirkülasyon-Finans) ----
+
+
+
+tum_tablo <- birim_per_loc_sirk_tbl %>%
+  left_join(finans_tbl_kar_last, by = "MusBirimId") %>%
+  filter(!is.na(Kar1_Yuzde_cum))
+
+
+
+tum_tablo
+
+
 
 
 # 3.0 MAPPING ----
 
 
 
-birim_per_loc_sirk_tbl $Enlem <- as.double(birim_per_loc_sirk_tbl $Enlem)
-birim_per_loc_sirk_tbl $Boylam <- as.double(birim_per_loc_sirk_tbl $Boylam)
+tum_tablo$Enlem <- as.double(tum_tablo$Enlem)
+tum_tablo$Boylam <- as.double(tum_tablo$Boylam)
 
 
 
 location_analysis_map <- leaflet() %>%
   addTiles() %>%
-  addCircleMarkers(data = birim_per_loc_sirk_tbl, lng = birim_per_loc_sirk_tbl $Boylam, lat = birim_per_loc_sirk_tbl $Enlem, radius = 2)
+  addCircleMarkers(data = tum_tablo, lng = tum_tablo$Boylam, lat = tum_tablo$Enlem, radius = 2)
 
 
 
@@ -389,9 +453,9 @@ dist <- 50
 
 
 
-loc1 <- birim_per_loc_sirk_tbl %>%
-  mutate(distance = earth.dist(birim_per_loc_sirk_tbl$Boylam[[1]],birim_per_loc_sirk_tbl$Enlem[[1]],
-                               birim_per_loc_sirk_tbl$Boylam, birim_per_loc_sirk_tbl$Enlem)) %>%
+loc1 <- tum_tablo %>%
+  mutate(distance = earth.dist(tum_tablo$Boylam[[1]],tum_tablo$Enlem[[1]],
+                               tum_tablo$Boylam, tum_tablo$Enlem)) %>%
   filter(distance <= dist)
 loc1
 
@@ -404,12 +468,12 @@ loc1
 
 test_map <- leaflet() %>%
   addTiles() %>%
-  addCircleMarkers(data = birim_per_loc_sirk_tbl,
-                   lng = birim_per_loc_sirk_tbl$Boylam, lat = birim_per_loc_sirk_tbl$Enlem, radius = 1) %>%
+  addCircleMarkers(data = tum_tablo,
+                   lng = tum_tablo$Boylam, lat = tum_tablo$Enlem, radius = 1) %>%
   #
   addCircles(
-    lng = birim_per_loc_sirk_tbl$Boylam[[1]],
-    lat = birim_per_loc_sirk_tbl$Enlem[[1]],
+    lng = tum_tablo$Boylam[[1]],
+    lat = tum_tablo$Enlem[[1]],
     radius = 50000,
     weight = 5,
     opacity = 0.5,
@@ -446,15 +510,16 @@ per_map_func <- function(diameter = 50, i = 1) {
   
   # Selected Area Table
   
-  area_per <- birim_per_loc_sirk_tbl %>%
+  area_per <- tum_tablo %>%
     
-    mutate(distance = earth.dist(birim_per_loc_sirk_tbl$Boylam[[i]],birim_per_loc_sirk_tbl$Enlem[[i]],
-                                 birim_per_loc_sirk_tbl$Boylam, birim_per_loc_sirk_tbl$Enlem)) %>%
+    mutate(distance = earth.dist(tum_tablo$Boylam[[i]],tum_tablo$Enlem[[i]],
+                                 tum_tablo$Boylam, tum_tablo$Enlem)) %>%
     filter(distance <= diameter)
   
   total_per <- sum(area_per$kisisay)
-  area_ort_sirk <- scales::percent(mean(area_per$toplam_sirk), accuracy =0.1)
-  area_aylık_ort_sirk <- scales::percent(mean(area_per$ aylık_ort_sirk), accuracy =0.1)
+  area_ort_sirk <- scales::percent(mean(area_per$toplam_sirk), accuracy = 0.1)
+  area_aylık_ort_sirk <- scales::percent(mean(area_per$aylık_ort_sirk), accuracy =0.1)
+  area_ort_kar1_yuzde <- scales::percent(mean(area_per$Kar1_Yuzde_cum), accuracy =0.1)
   
   
   # Map
@@ -462,8 +527,10 @@ per_map_func <- function(diameter = 50, i = 1) {
   contenido <- paste(sep = "<br/>",
                      #paste0("<img src='https://www.r-project.org/logo/Rlogo.png", "' />"),
                      paste0("<b>Toplam Personel: </b>", total_per),
-                     paste0("<b>Toplam Ortalama Sirkülasyon: </b>",area_ort_sirk),
-                     paste0("<b>Aylık Ortalama Sirkülasyon: </b>", area_aylık_ort_sirk))
+                     paste0("<b>Toplam Ortalama Sirkülasyon: </b>", area_ort_sirk),
+                     paste0("<b>Aylık Ortalama Sirkülasyon: </b>",area_aylık_ort_sirk),
+                     paste0("<b>Ortalama Kar1%: </b>", area_ort_kar1_yuzde)
+  )
   
   # paste0("<a href='https://en.wikipedia.org/wiki/Frigor%C3%ADfico_Anglo_del_Uruguay", "'>Link</a>"))
   
@@ -471,11 +538,11 @@ per_map_func <- function(diameter = 50, i = 1) {
   
   per_map <- leaflet() %>%
     addTiles() %>%
-    addCircleMarkers(data = birim_per_loc_sirk_tbl, lng = birim_per_loc_sirk_tbl$Boylam, lat = birim_per_loc_sirk_tbl$Enlem, radius = 1) %>%
+    addCircleMarkers(data = tum_tablo, lng = tum_tablo$Boylam, lat = tum_tablo$Enlem, radius = 1) %>%
     #
     addCircles(
-      lng = birim_per_loc_sirk_tbl$Boylam[[i]],
-      lat = birim_per_loc_sirk_tbl$Enlem[[i]],
+      lng = tum_tablo$Boylam[[i]],
+      lat = tum_tablo$Enlem[[i]],
       radius = diameter*1000,
       weight = 5,
       opacity = 0.5,
@@ -485,12 +552,11 @@ per_map_func <- function(diameter = 50, i = 1) {
       color = "red") %>%
     #
     
-    addMarkers(lng = birim_per_loc_sirk_tbl$Boylam[[i]], lat = birim_per_loc_sirk_tbl$Enlem[[i]]) %>%
-    
+    addMarkers(lng = tum_tablo$Boylam[[i]], lat = tum_tablo$Enlem[[i]]) %>%
     #
-    addPopups(data = birim_per_loc_sirk_tbl,
-              lng = birim_per_loc_sirk_tbl$Boylam[[i]],
-              lat = birim_per_loc_sirk_tbl$Enlem[[i]],
+    addPopups(data = tum_tablo,
+              lng = tum_tablo$Boylam[[i]],
+              lat = tum_tablo$Enlem[[i]],
               popup = contenido,
               options = popupOptions(closeButton = TRUE)) %>%
     #
@@ -514,4 +580,5 @@ per_map_func <- function(diameter = 50, i = 1) {
 
 
 
-per_map_func(50, 765)
+per_map_func(120, 950)
+
