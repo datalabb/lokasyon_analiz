@@ -1,8 +1,22 @@
 
 #SİRKÜLASYON ÇALIŞMASI
 
+istihdam_log_saha_tbl <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/istihdam_log_saha.rds")
+
+smart_birimler_tbl <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/smart_birimler_saved.rds")
+smart_birimler_tbl 
+
+smart_birimler_tbl$Il <- smart_birimler_tbl$Il %>% iconv(to="UTF-8")
+smart_birimler_tbl$Ilce <- smart_birimler_tbl$Ilce %>% iconv(to="UTF-8")
+
+smart_birimler_tbl$Enlem <- as.numeric(smart_birimler_tbl$Enlem)
+smart_birimler_tbl$Boylam <- as.numeric(smart_birimler_tbl$Boylam)
+
+birimler_lokasyon_tbl <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/birimler_lokasyon_saved.rds")
 
 
+library(lubridate)
+library(tidyverse)
 #DATA SETS
 
 #smart_birimler_tbl <- SELECT * FROM [smartAx].[dbo].[vMusBirim]
@@ -30,7 +44,6 @@ toplam_personel_sayisi <- function(donem = donem_tarih) {
     ungroup()
 
 }
-
 
 personel_tablosu <- data.frame()
 
@@ -67,26 +80,18 @@ for (donem in as.list(hesaplanacak_aylar)) {
 ayrılan_tablosu 
 
 
-
-
-
 #TOPLAM PERSONEL İLE AYRILAN TABLOSU BİRLEŞTİRİLMESİ
 
-
-genel_tablo <- personel_tablosu %>% left_join(ayrılan_tablosu, by= "PROJECTUNITNAME") %>% 
+genel_tablo <- personel_tablosu %>% left_join(ayrılan_tablosu, by= "PROJECTUNITNAME", "Donem_tarih") %>% 
   select(PROJNAME.x, PROJECTUNITNAME, PROJECTUNITID.x, saha_per, ayrılan_per, Donem_tarih.x, Ay.x)
 
-
 genel_tablo$ayrılan_per[is.na(genel_tablo$ayrılan_per)] <- 0
-
 
 str(genel_tablo)
 
 #BİRİM/DÖNEMBAZLI SİRKÜLASYON KATSAYISININ DATAYA SÜTUN OLARAK EKLENMESİ
 
-
 genel_tablo$sirkulasyon_oranı <- genel_tablo$ayrılan_per/ genel_tablo$saha_per
-
 
 #ORTALAMA SİRKÜLASYON TABLOSU
 #Birimlerin dönemlik hesaplanan sirkülasyon oranlarının ortalamasının alınarak birim bazlı 2023 yılı ortalama sirkülasyon oranının hesaplanması
@@ -96,5 +101,4 @@ personel_tablosu_avg <- genel_tablo %>%
   ungroup()
 
 personel_tablosu_avg 
-
 

@@ -1,0 +1,152 @@
+---
+title: "İşten Çıkış Analiz"
+author: "tugce"
+date: "2023-06-05"
+output: html_document
+---
+
+#Library
+  
+```{r}
+library(tidyverse)
+library(e1071)
+library(caTools)
+library(caret)
+```
+
+#Datasets
+
+```{r}
+istihdam <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/istihdam_log_saha.rds")
+personel_tbl <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/personel.rds")
+smart_birimler_tbl <- readRDS("C:/Users/tugce.topcu/Desktop/R/Data/smart_birimler_saved.rds")
+```
+
+
+#Creating Data
+
+```{r}
+istihdam <- istihdam %>% rename(TcKimlikNo = "ABTCKIMLIKNO")
+
+data<- istihdam %>% left_join(personel_tbl, by = "TcKimlikNo") %>% 
+  select(TcKimlikNo,NAMEALIAS,EGITIMDURUMU,PersonelTipiveDurumu, AktifMi ,Cinsiyet, DogumTarihi,PROJNAME,PROJECTUNITNAME,MusBirimAd, MusProjeAd, ENDDATE, STARTDATE, ISTENAYRILMAKODUSGK, HIZMETYERI,  SonGorevBaslangicTarihi, SonGorevBitisTarihi, OrgBolgeAd,SgkIlkGirisTarihi, KrediKartiVarMi , EMPLOYEETYPE,LOGTYPE, PROJECTUNITID) %>% 
+  filter(LOGTYPE != 1)
+
+summary(data)
+```
+
+
+#New Variables
+
+```{r}
+#Güncel Yaş
+
+data$DogumTarihi <- as.Date(data$DogumTarihi)
+data$GUNCELYAS <- difftime(Sys.Date(), data$DogumTarihi, units = "days") / 365.25
+data$GUNCELYAS <- as.numeric(data$GUNCELYAS)
+
+#İşe Başlama Yaşı
+data$STARTDATE <- as.Date(data$STARTDATE)
+data$ISEBASLAMAYASI <- as.numeric(difftime(data$STARTDATE, data$DogumTarihi, units = "days")) / 365.25
+
+#İşten Ayrılma Yaşı
+data$ENDDATE <- as.Date(data$ENDDATE)
+data$ISTENAYRILMAYASI <- as.numeric(difftime(data$ENDDATE, data$DogumTarihi, units = "days")) / 365.25
+
+#Securitas Çalışma Süresi
+data$Securitas_CALISMASURE <- as.numeric(difftime(data$ENDDATE, data$STARTDATE, units = "days")) / 365.25
+
+```
+
+
+#Yeni sütunlar için join (İl - Bölge - Segment - Hizmetyeri)
+
+```{r}
+#İstihdam Datasından "PROJECTUNITID" ile Smart birimlerden "AxBirimId" ortak sütunlar
+
+smart_birimler_tbl_ozet <- smart_birimler_tbl %>%  
+  rename(PROJECTUNITID = "AxBirimId") %>%  
+  select(MusProjeAd, Ad, OrgBolgeAd, MusAltSegmentAd,MusHizmetYeriAd, Enlem,Boylam,Il, PROJECTUNITID, MusSegmentAd) 
+  
+
+data<- data %>% left_join(smart_birimler_tbl_ozet, by= "PROJECTUNITID")  %>% 
+  select(TcKimlikNo, Cinsiyet, GUNCELYAS, ISEBASLAMAYASI, Securitas_CALISMASURE, ISTENAYRILMAYASI, OrgBolgeAd.y, MusHizmetYeriAd , MusSegmentAd, AktifMi, MusBirimAd, PROJECTUNITID) %>% 
+  filter(ISEBASLAMAYASI >=20) %>% 
+  filter(Securitas_CALISMASURE>0)
+
+
+data$Cinsiyet <- as.factor(data$Cinsiyet)
+
+
+data$ISEBASLAMAYASI2 <- ifelse(data$ISEBASLAMAYASI >= 20 & data$ISEBASLAMAYASI < 30, "20-30",
+                               ifelse(data$ISEBASLAMAYASI >= 30 & data$ISEBASLAMAYASI < 40, "30-40",
+                                      ifelse(data$ISEBASLAMAYASI >= 40 & data$ISEBASLAMAYASI < 50, "40-50",
+                                             ifelse(data$ISEBASLAMAYASI >= 50, "50+", NA))))
+
+
+data$ISEBASLAMAYASI2 <- as.factor(data$ISEBASLAMAYASI2)
+
+
+#LOKASYON DATASIYLA BAĞLANMASI
+
+
+lokasyon_tbl <-readRDS("C:/Users/tugce.topcu/Desktop/R/Data/birimler_lokasyon_saved.rds")
+data <- data %>% rename(AxBirimId = "PROJECTUNITID")
+
+
+colnames(data)
+son_data <- data %>% left_join(lokasyon_tbl, by= "AxBirimId") %>% 
+  select(TcKimlikNo, Cinsiyet, GUNCELYAS, ISEBASLAMAYASI, Securitas_CALISMASURE, ISTENAYRILMAYASI, OrgBolgeAd.y, MusHizmetYeriAd, MusSegmentAd, AktifMi, MusBirimAd, AxBirimId, ISEBASLAMAYASI2, Enlem, Boylam)
+
+
+son_data<- na.omit(son_data)
+
+length(unique(son_data$TcKimlikNo))
+
+
+
+```
+
+
+
+```{r}
+
+son_fnc <- function(Cns = "K", BasYas = "20-30", Bolge = "109000 AKDENİZ BÖLGE MÜDÜRLÜĞÜ", Segment = "Havacılık", HizmetYeri = "Terminal") {
+  
+  # MULTIPLE LINEAR REGRESSION MODEL
+  model <- lm(Securitas_CALISMASURE ~ Cinsiyet + ISEBASLAMAYASI2 + OrgBolgeAd.y + MusSegmentAd + MusHizmetYeriAd, data = son_data)
+  
+  new_data <- data.frame(Cinsiyet = Cns,
+                         ISEBASLAMAYASI2 = BasYas,
+                         OrgBolgeAd.y = Bolge,
+                         MusSegmentAd = Segment,
+                         MusHizmetYeriAd = HizmetYeri)
+  
+  pred_regression <- predict(model, newdata = new_data)
+  
+  # NAIVE BAYES
+  regdata <- son_data %>% select(-ISEBASLAMAYASI, -Securitas_CALISMASURE, -ISTENAYRILMAYASI, -GUNCELYAS)
+  
+  split <- sample.split(regdata, SplitRatio = 0.7)
+  train_cl <- subset(regdata, split == "TRUE")
+  test_cl <- subset(regdata, split == "FALSE")
+  
+  set.seed(120)
+  classifier_cl <- naiveBayes(AktifMi ~ ., data = train_cl)
+  
+  pred_naive_bayes <- predict(classifier_cl, newdata = new_data)
+  
+ # Create a table
+  output_table <- data.frame("Ortalama Beklenen Çalışma Süresi" = pred_regression, "Uzun Dönem Çalışır Mı?" = pred_naive_bayes)
+  colnames(output_table) <- c("Ortalama Beklenen Çalışma Süresi", " Çalışmaya Devam Etme Durumu")
+  rownames(output_table) <- "Tahmin Algoritması"
+  
+  return(output_table)
+}
+son_fnc(BasYas = "30-40", Cns = "E")
+```
+
+
+
+
+

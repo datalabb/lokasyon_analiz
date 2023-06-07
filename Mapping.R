@@ -9,11 +9,7 @@
 install.packages("cli")
 library(cli)
 
-
-
 #PACKAGES ----
-
-
 
 if (!require("RColorBrewer")) {
   install.packages("xgboost")
@@ -144,11 +140,7 @@ birim_per_loc_tbl <- birim_personel_tbl %>%
   left_join(birimler_lokasyon_tbl_rvz, by = "MusBirimAd") %>%
   filter(!is.na(Enlem))
 
-
-
 birim_per_loc_tbl
-
-
 
 ## 2.2 Birim Sirkülasyon Tablosu ----
 
@@ -580,5 +572,5 @@ per_map_func <- function(diameter = 50, i = 1) {
 
 
 
-per_map_func(120, 950)
+per_map_func(100, 20)
 
